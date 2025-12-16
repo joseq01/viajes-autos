@@ -1,0 +1,793 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Janos - Seguimiento de Viajes</title>
+
+<!-- SweetAlert -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<style>
+  body { font-family: Arial, sans-serif; margin:20px; background:#f7f7f7; }
+  h1 { text-align:center; margin-bottom:20px; }
+  .boton-cargar { display:block; margin:0 auto 20px auto; padding:8px 16px; background:#007bff; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+  .boton-cargar:hover { background:#0056b3; }
+  .table-container { margin:20px 0; background:#f0f0f0; padding:10px; border-radius:6px; border:1px solid #ccc; overflow-x:auto; }
+  table { width:100%; border-collapse: collapse; min-width:600px; }
+  th, td { border:1px solid #ccc; padding:6px 8px; text-align:left; vertical-align:middle; white-space:nowrap; }
+  th { background:#007bff; color:#fff; position: sticky; top:0; }
+  tbody tr:nth-child(even) { background:#f2f2f2; }
+  button { padding:4px 8px; border:none; border-radius:4px; background:#28a745; color:#fff; cursor:pointer; }
+  button:hover { background:#218838; }
+  .editarBtn { background:#fd7e14; color:#fff; }
+  .editarBtn:hover { background:#e36b0c; }
+  .cancelarBtn { background:#dc3545; margin-left:5px; }
+  .cancelarBtn:hover { background:#c82333; }
+  .scrollable-cell { max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition: all 0.3s ease; cursor:pointer; }
+  .scrollable-cell:hover { max-width:400px; white-space:normal; background:#e8f0ff; padding:5px; border-radius:4px; }
+  .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:999; }
+  .modal-content { background:#fff; padding:15px; border-radius:6px; max-width:90%; max-height:90%; overflow:auto; position:relative; }
+  .modal-close { position:absolute; top:8px; right:10px; background:#dc3545; color:#fff; border:none; border-radius:4px; padding:2px 6px; cursor:pointer; }
+  .modal-close:hover { background:#c82333; }
+  .map-container { width:100%; height:300px; margin-top:10px; border-radius:6px; }
+  .col-fecha {
+  width: 130px;
+  font-size: 12px;
+}
+
+.boton-historial {
+  position: absolute;
+  left: 20px;
+  top: 80px;              /* misma altura visual que Cargar Viaje */
+  padding: 6px 12px;
+  background: #6c757d;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.boton-historial:hover {
+  background: #5a6268;
+}
+
+.estado-parpadeo {
+  animation: pulseEstado 1.2s ease-in-out infinite;
+}
+
+@keyframes pulseEstado {
+  0%   { background-color: transparent; }
+  50%  { background-color: rgba(0, 123, 255, 0.15); }
+  100% { background-color: transparent; }
+}
+
+.tbody-hidden {
+  visibility: hidden;
+}
+
+.scrollable-cell img {
+  max-height: 80px;
+  object-fit: contain;
+}
+
+.img-modal-scroll {
+  max-height: 100vh;
+  max-width: 100vw;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.img-modal-scroll img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+</style>
+</head>
+<body>
+
+<h1>Janos</h1>
+<button class="boton-cargar" onclick="location.href='nuevo_viaje.html'">Cargar Viaje</button>
+<button class="boton-historial" onclick="location.href='historial_viajes.html'">
+  📜 Historial
+</button>
+
+
+<!-- Viajes Pendientes -->
+<div class="table-container">
+  <h3>Viajes Pendientes</h3>
+  <table>
+    <thead>
+      <tr>
+      <tr>
+    <th class="col-fecha">Fecha</th>
+    <th>Cargado por</th>
+    <th>Origen</th>
+    <th>Transporta</th>
+        <th>Destino</th>
+        <th>Estado</th>
+        <th>Acción</th>
+      </tr>
+    </thead>
+    <tbody id="viajesPendientes">
+      <tr><td colspan="7">Cargando...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Viajes en Curso -->
+<div class="table-container">
+  <h3>Viajes en Curso</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Origen - Destino</th>
+        <th>Transporta</th>
+        <th>Chofer</th>
+        <th>Estado</th>
+        <th>Acción</th>
+      </tr>
+    </thead>
+    <tbody id="viajesEnCurso">
+      <tr><td colspan="5">Cargando...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- MODAL MAPA / IMAGEN -->
+<div id="modal" class="modal">
+  <div class="modal-content" id="modalContent">
+    <button class="modal-close" id="modalClose">X</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+window.googleMapsListo = function () {
+  window.mapaCargado = true;
+};
+</script>
+
+
+<!-- API KEY CORREGIDA -->
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBuAsS0aqT8e6ECtMj-mmZsBemBoMTivoY&libraries=geometry&callback=googleMapsListo">
+</script>
+
+
+<script type="module">
+
+// ✅ Esperar a que Google Maps cargue antes de ejecutar todo el módulo
+await new Promise(res => {
+  const int = setInterval(() => {
+    if (window.mapaCargado) {
+      clearInterval(int);
+      res();
+    }
+  }, 100);
+});
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+import { 
+  getFirestore, collection, getDocs, setDoc, doc, addDoc, serverTimestamp, deleteDoc, updateDoc,
+  query, where, orderBy, limit, getDoc
+} from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
+
+// ----------------- FIREBASE ------------------
+const firebaseConfig = {
+  apiKey: "AIzaSyBuAsS0aqT8e6ECtMj-mmZsBemBoMTivoY",
+  authDomain: "viajesautos.firebaseapp.com",
+  projectId: "viajesautos",
+  storageBucket: "viajesautos.firebasestorage.app",
+  messagingSenderId: "593140621786",
+  appId: "1:593140621786:web:bb5eba2477c5efda56a0e3"
+};
+
+// 1️⃣ Inicializamos Firebase
+const app = initializeApp(firebaseConfig);
+
+// 2️⃣ Inicializamos Firestore
+const db = getFirestore(app);
+
+// 3️⃣ Inicializamos Storage
+const storage = getStorage(app);
+
+// -------------------------------
+let intervalGPS = {};
+let mapRefreshIntervals = {};  // ⚠️ para refrescar mapas en vivo
+
+const modal = document.getElementById("modal");
+const modalBody = document.getElementById("modalBody");
+const modalClose = document.getElementById("modalClose");
+
+modalClose.onclick = () => {
+  modal.style.display = "none";
+  // limpiar intervalos de mapas abiertos
+  for (const k in mapRefreshIntervals) {
+    clearInterval(mapRefreshIntervals[k]);
+    delete mapRefreshIntervals[k];
+  }
+};
+
+// --------------------------------------------------
+// VIAJES PENDIENTES
+// --------------------------------------------------
+async function cargarViajesPendientes() {
+  const tbody = document.getElementById("viajesPendientes");
+  tbody.innerHTML = "";
+  const q = query(
+  collection(db, "viajes"),
+  orderBy("fecha", "asc") // más viejo → más nuevo
+);
+
+const snapshot = await getDocs(q);
+
+  let hay = false;
+
+  snapshot.forEach(docSnap => {
+    const data = docSnap.data();
+    const id = docSnap.id;
+
+    if (data.estado !== "pendiente") return;
+
+    hay = true;
+    const fecha = data.fecha?.toDate
+  ? data.fecha.toDate().toLocaleString("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    })
+  : "-";
+
+    const origen = data.origen || "-";
+    const transporta = data.transporta || "-";
+    const destino = data.destinos?.join(", ") || "-";
+
+    const tr = document.createElement("tr");
+   tr.innerHTML = `
+  <td class="col-fecha">${fecha}</td>
+  <td>${data.creadoPorNombre || "-"}</td>
+  <td>${origen}</td>
+ <td class="scrollable-cell">
+  ${
+    typeof transporta === "string" && transporta.startsWith("https://")
+      ? `<img 
+           src="${transporta}" 
+           class="img-transporta"
+           data-img="${transporta}"
+           style="max-width:120px; border-radius:6px; cursor:pointer;"
+         >`
+      : transporta
+  }
+</td>
+  <td>${destino}</td>
+  <td>pendiente</td>
+  <td>
+     <button class="editarBtn">Editar</button>
+     <button class="asignarBtn">Asignar</button>
+  </td>
+`;
+
+const img = tr.querySelector(".img-transporta");
+if (img) {
+  img.onclick = () => {
+ Swal.fire({
+  html: `
+    <div class="img-modal-scroll">
+      <img src="${img.dataset.img}" />
+    </div>
+  `,
+  showConfirmButton: false,
+  showCloseButton: false,
+  backdrop: true,
+  background: "transparent",
+  padding: 0,
+  width: "100vw",
+  didOpen: (popup) => {
+    // cerrar con click
+    popup.addEventListener("click", () => Swal.close());
+
+    // swipe down para cerrar (celular)
+    let startY = null;
+    popup.addEventListener("touchstart", e => {
+      startY = e.touches[0].clientY;
+    });
+
+    popup.addEventListener("touchend", e => {
+      if (startY === null) return;
+      const endY = e.changedTouches[0].clientY;
+      if (endY - startY > 120) Swal.close();
+      startY = null;
+    });
+  }
+});
+
+  };
+}
+
+
+//EDITAR VIAJES
+tr.querySelector(".editarBtn").onclick = async () => {
+  let nuevaImagenBlob = null;
+  let eliminarImagen = false;
+
+  const { value: datosEditados, isDenied } = await Swal.fire({
+    title: "✏️ Editar viaje pendiente",
+    html: `
+      <div style="text-align:left;font-size:14px">
+
+        <label style="font-weight:bold;margin-top:5px;display:block">Origen</label>
+        <input id="sw-origen" class="swal2-input"
+               placeholder="Origen"
+               value="${origen}">
+
+        <label style="font-weight:bold;margin-top:10px;display:block">Destino/s</label>
+        <textarea id="sw-destinos" class="swal2-textarea"
+                  placeholder="Destinos separados por coma">${data.destinos?.join(", ") || ""}</textarea>
+
+        <hr style="margin:12px 0">
+
+        <label style="font-weight:bold;display:block">Qué transporta</label>
+        <div id="sw-transporta" contenteditable="true" 
+             style="
+               min-height:60px;
+               border:1px solid #dcdcdc;
+               border-radius:6px;
+               padding:6px;
+               overflow:auto;
+               font-size:14px;
+               position:relative;
+             ">${typeof transporta === "string" && transporta.startsWith("https://") ? "" : transporta}
+
+          <!-- PREVIEW IMAGEN DENTRO DEL DIV -->
+          <div id="sw-img-wrap" style="position:absolute; top:5px; right:5px; display:${typeof transporta === "string" && transporta.startsWith("https://") ? "block" : "none"}">
+            <img id="sw-img-preview" src="${typeof transporta === "string" && transporta.startsWith("https://") ? transporta : ""}" style="max-width:100px; border-radius:6px;">
+            <button id="sw-img-remove" style="
+              position:absolute;
+              top:-8px;
+              right:-8px;
+              background:#e74c3c;
+              color:#fff;
+              border:none;
+              border-radius:50%;
+              width:24px;
+              height:24px;
+              cursor:pointer;
+            ">✕</button>
+          </div>
+
+        </div>
+
+      </div>
+    `,
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: "Guardar cambios",
+    denyButtonText: "🗑 Cancelar viaje",
+    cancelButtonText: "Cerrar",
+    focusConfirm: false,
+
+    didOpen: () => {
+      const imgWrap = document.getElementById("sw-img-wrap");
+      const imgPreview = document.getElementById("sw-img-preview");
+      const btnRemove = document.getElementById("sw-img-remove");
+      const transportaDiv = document.getElementById("sw-transporta");
+
+      // eliminar imagen
+      btnRemove.onclick = () => {
+        eliminarImagen = true;
+        nuevaImagenBlob = null;
+        imgWrap.style.display = "none";
+      };
+
+      // pegar imagen desde portapapeles
+      transportaDiv.addEventListener("paste", e => {
+        const item = [...e.clipboardData.items].find(i => i.type.startsWith("image/"));
+        if (!item) return;
+
+        nuevaImagenBlob = item.getAsFile();
+        eliminarImagen = false;
+
+        const url = URL.createObjectURL(nuevaImagenBlob);
+        imgPreview.src = url;
+        imgWrap.style.display = "block";
+
+        e.preventDefault(); // evita pegar como texto
+      });
+    },
+
+    preConfirm: () => {
+      const origenNuevo = document.getElementById("sw-origen").value.trim();
+      const transportaNuevo = document.getElementById("sw-transporta").innerHTML.trim();
+      const destinosNuevo = document.getElementById("sw-destinos").value
+        .split(",")
+        .map(d => d.trim())
+        .filter(d => d);
+
+      if (!origenNuevo || destinosNuevo.length === 0) {
+        Swal.showValidationMessage("Debés indicar origen y al menos un destino");
+        return;
+      }
+
+      return {
+        origen: origenNuevo,
+        transporta: transportaNuevo,
+        destinos: destinosNuevo
+      };
+    }
+  });
+
+  // 🗑 CANCELAR VIAJE
+  if (isDenied) {
+    const confirmar = await Swal.fire({
+      title: "¿Cancelar viaje?",
+      text: "El viaje será eliminado de los pendientes",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, cancelar",
+      cancelButtonText: "No"
+    });
+
+    if (!confirmar.isConfirmed) return;
+
+    await deleteDoc(doc(db, "viajes", id));
+
+    Swal.fire({
+      icon: "success",
+      title: "Viaje cancelado",
+      timer: 1500,
+      showConfirmButton: false
+    });
+
+    cargarViajesPendientes();
+    return;
+  }
+
+  // ❌ Cerró sin hacer nada
+  if (!datosEditados) return;
+
+let transportaFinal = datosEditados.transporta;
+
+// 🗑 si eliminó la imagen
+if (eliminarImagen) {
+  transportaFinal = "";
+}
+
+// 📤 si pegó una imagen nueva
+if (nuevaImagenBlob) {
+  const imgRef = ref(storage, `viajes/${id}_${Date.now()}.jpg`);
+  await uploadBytes(imgRef, nuevaImagenBlob);
+  transportaFinal = await getDownloadURL(imgRef);
+}
+
+// 💾 guardar todo junto en Firestore
+await updateDoc(doc(db, "viajes", id), {
+  ...datosEditados,
+  transporta: transportaFinal
+});
+
+
+  Swal.fire({
+    icon: "success",
+    title: "Viaje actualizado",
+    text: "Los datos del viaje fueron modificados correctamente",
+    timer: 1800,
+    showConfirmButton: false
+  });
+
+  cargarViajesPendientes();
+};
+
+//ver//
+
+    tr.querySelector(".asignarBtn").onclick = async () => {
+      const choferesSnap = await getDocs(collection(db, "chofer"));
+      let listaChoferes = [];
+      choferesSnap.forEach(d => listaChoferes.push({ nombre: d.id, pin: d.data().pin }));
+
+      if (!listaChoferes.length) return alert("No hay choferes cargados.");
+
+      let opciones = listaChoferes.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join("");
+
+      const cont = document.createElement("div");
+      cont.innerHTML = `
+        <h3>Asignar viaje</h3>
+        <select id="selChofer" style="width:100%;padding:10px;border-radius:6px;">
+          <option value="">Seleccione...</option>
+          ${opciones}
+        </select>
+        <button id="btnAsignar" style="margin-top:10px;width:100%;">Asignar</button>
+      `;
+      mostrarModal(cont);
+
+      document.getElementById("btnAsignar").onclick = async () => {
+        const choferSel = document.getElementById("selChofer").value;
+        if (!choferSel) return alert("Debe elegir un chofer");
+
+        const elegido = listaChoferes.find(c => c.nombre === choferSel);
+
+        await setDoc(doc(db, "seguimiento", id), {
+          ...data,
+          chofer: elegido.nombre,
+          pin: elegido.pin,
+          estado: "en espera",
+          aceptado: false,
+          horaAsignacion: serverTimestamp(),
+          viajeId: id
+        });
+
+        await deleteDoc(doc(db, "viajes", id));
+
+        modal.style.display = "none";
+        cargarViajesPendientes();
+        cargarViajesEnCurso();
+      };
+    };
+
+    tbody.appendChild(tr);
+  });
+
+  if (!hay) tbody.innerHTML = '<tr><td colspan="7">No hay viajes pendientes</td></tr>';
+}
+
+// --------------------------------------------------
+// VIAJES EN CURSO
+// --------------------------------------------------
+async function cargarViajesEnCurso() {
+  const tbody = document.getElementById("viajesEnCurso");
+tbody.classList.add("tbody-hidden");
+tbody.innerHTML = "";
+
+
+  const snapshot = await getDocs(collection(db, "seguimiento"));
+  let hay = false;
+
+  snapshot.forEach(docSnap => {
+    const d = docSnap.data();
+    const idSeg = docSnap.id;
+
+    if (d.estado !== "en espera" && d.estado !== "en camino") return;
+
+    hay = true;
+
+    const origenText = d.origen || "-";
+    const destinoText = d.destinos?.join(", ") || "-";
+    const transportaText = d.transporta || "-";
+
+    let estadoLindo =
+      d.estado === "en espera"
+        ? "En espera (chofer asignado)"
+        : "En camino (chofer aceptó)";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${origenText} → ${destinoText}</td>
+       <td class="scrollable-cell">
+   ${
+  typeof transportaText === "string" && transportaText.startsWith("https://")
+    ? `<img 
+         src="${transportaText}"
+         class="img-transporta"
+         data-img="${transportaText}"
+         style="max-width:120px; border-radius:6px; cursor:pointer;"
+       >`
+    : transportaText
+}
+
+  </td>
+      <td>${d.chofer}</td>
+      <td class="estado-parpadeo">${estadoLindo}</td>
+
+      <td>
+        <button class="verMapaBtn">Ver Mapa</button>
+        <button class="cancelarBtn">Cancelar</button>
+      </td>
+    `;
+  const img = tr.querySelector(".img-transporta");
+if (img) {
+  img.onclick = () => {
+    Swal.fire({
+      html: `
+        <div class="img-modal-scroll">
+          <img src="${img.dataset.img}" />
+        </div>
+      `,
+      showConfirmButton: false,
+      showCloseButton: false,
+      backdrop: true,
+      background: "transparent",
+      padding: 0,
+      width: "100vw",
+      didOpen: (popup) => {
+        popup.addEventListener("click", () => Swal.close());
+
+        let startY = null;
+        popup.addEventListener("touchstart", e => {
+          startY = e.touches[0].clientY;
+        });
+
+        popup.addEventListener("touchend", e => {
+          if (startY === null) return;
+          const endY = e.changedTouches[0].clientY;
+          if (endY - startY > 120) Swal.close();
+          startY = null;
+        });
+      }
+    });
+  };
+}
+
+    // ------------------ VER MAPA -------------------
+    tr.querySelector(".verMapaBtn").onclick = () => {
+      
+      const cont = document.createElement("div");
+      cont.innerHTML = `
+        <h3>Mapa del Viaje</h3>
+        <div id="map" style="height:400px;width:100%;border-radius:10px;"></div>
+      `;
+      mostrarModal(cont);
+
+      const renderMap = async () => {
+        const mapEl = document.getElementById("map");
+        if (!mapEl) return;
+
+        const map = new google.maps.Map(mapEl, {
+          zoom: 12,
+          center: { lat: -34.6037, lng: -58.3816 }
+        });
+
+        const qUbic = query(
+          collection(db, "ubicaciones"),
+          where("viajeId", "==", d.viajeId),
+          orderBy("fecha")
+        );
+        const snap = await getDocs(qUbic);
+
+        const puntos = [];
+        snap.forEach(u => {
+          const ud = u.data();
+          if (ud.lat && ud.lng) puntos.push({ lat: ud.lat, lng: ud.lng });
+        });
+
+        if (puntos.length === 0) {
+          // Ruta simple origen-destino
+          const directionsService = new google.maps.DirectionsService();
+          const directionsRenderer = new google.maps.DirectionsRenderer({ map: map });
+
+          directionsService.route({
+            origin: origenText,
+            destination: destinoText,
+            travelMode: google.maps.TravelMode.DRIVING
+          }, (result, status) => {
+            if (status === "OK") {
+              directionsRenderer.setDirections(result);
+            }
+          });
+
+          return;
+        }
+
+        const path = puntos;
+        const poly = new google.maps.Polyline({
+          path,
+          geodesic: true,
+          strokeOpacity: 0.9,
+          strokeWeight: 5
+        });
+        poly.setMap(map);
+
+        const bounds = new google.maps.LatLngBounds();
+        path.forEach(p => bounds.extend(p));
+        map.fitBounds(bounds);
+
+        new google.maps.Marker({
+          position: path[path.length - 1],
+          map: map,
+          title: "Última ubicación"
+        });
+      };
+
+      renderMap();
+
+      if (mapRefreshIntervals[d.viajeId]) {
+        clearInterval(mapRefreshIntervals[d.viajeId]);
+      }
+      mapRefreshIntervals[d.viajeId] = setInterval(renderMap, 8000);
+    };
+
+ // ------------------ CANCELAR -------------------
+tr.querySelector(".cancelarBtn").onclick = async () => {
+  try {
+    // Traemos datos frescos desde SEGUIMIENTO (el viaje real)
+    const segRef = doc(db, "seguimiento", idSeg);
+    const segSnap = await getDoc(segRef);
+
+    if (!segSnap.exists()) {
+      Swal.fire("Error", "Este viaje ya no existe en seguimiento.", "error");
+      return;
+    }
+
+    const viaje = segSnap.data();
+
+    // ❌ NO cancelar si el chofer ya aceptó
+    if (viaje.aceptado === true || viaje.estado === "en camino") {
+      Swal.fire(
+        "No se puede cancelar",
+        "El chofer ya aceptó este viaje o está en camino.",
+        "warning"
+      );
+      return;
+    }
+
+    // ✔ Confirmación SweetAlert
+    const confirmar = await Swal.fire({
+      title: "Cancelar viaje",
+      text: "¿Seguro que querés cancelar este viaje?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Sí, cancelar",
+      cancelButtonText: "No",
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6"
+    });
+
+    if (!confirmar.isConfirmed) return;
+
+    // ✔ Cancelar → volver a viajes pendientes
+    await setDoc(doc(db, "viajes", viaje.viajeId), {
+      ...viaje,
+      estado: "pendiente",
+      chofer: "",
+      pin: "",
+      aceptado: false
+    });
+
+    // ✔ Eliminar seguimiento
+    await deleteDoc(segRef);
+
+    Swal.fire("Cancelado", "El viaje ha sido cancelado.", "success");
+
+    cargarViajesPendientes();
+    cargarViajesEnCurso();
+
+  } catch (err) {
+    console.error("Error al cancelar:", err);
+    Swal.fire("Error", "Ocurrió un error al cancelar.", "error");
+  }
+};
+
+
+    tbody.appendChild(tr);
+  });
+
+   if (!hay) {
+    tbody.innerHTML = '<tr><td colspan="5">No hay viajes en curso</td></tr>';
+  }
+
+  // ✅ ACÁ VA — ÚNICO LUGAR CORRECTO
+  tbody.classList.remove("tbody-hidden");
+}
+
+
+// -------------------
+cargarViajesPendientes();
+cargarViajesEnCurso();
+setInterval(cargarViajesEnCurso, 4000);
+
+function mostrarModal(content){
+  modalBody.innerHTML = "";
+  modalBody.appendChild(content);
+  modal.style.display = "flex";
+}
+</script>
+
+
+</body>
+</html>

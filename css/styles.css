@@ -1,0 +1,71 @@
+body {
+  margin: 0;
+  padding: 0;
+  background: #111;
+  color: white;
+  font-family: Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.container {
+  background: #1b1b1b;
+  padding: 30px;
+  width: 90%;
+  max-width: 420px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 0 15px rgba(0,0,0,0.6);
+}
+
+.logo {
+  font-size: 34px;
+  font-weight: bold;
+  margin-bottom: 5px;
+  background: linear-gradient(45deg, #ffcc00, #ff8800);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  font-size: 16px;
+  margin-bottom: 20px;
+  color: #ccc;
+}
+
+.section-title {
+  margin-top: 20px;
+  font-size: 20px;
+  color: #ffcc00;
+}
+
+.lista-viajes button {
+  background: #ffcc00;
+  border: none;
+  padding: 10px;
+  width: 100%;
+  margin-top: 10px;
+  cursor: pointer;
+  border-radius: 6px;
+  font-weight: bold;
+}
+
+.lista-viajes button:hover {
+  background: #ffaa00;
+}
+
+.estado {
+  margin-top: 15px;
+  background: #222;
+  padding: 10px;
+  border-radius: 6px;
+  min-height: 40px;
+}
+
+.footer {
+  margin-top: 25px;
+  font-size: 12px;
+  color: #888;
+}

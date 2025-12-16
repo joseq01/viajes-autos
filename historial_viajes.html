@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Janos - Historial de Viajes</title>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f7f7f7;
+  }
+
+  h1 {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+
+  h2 {
+    margin: 30px 0 10px;
+    color: #333;
+    border-left: 5px solid #007bff;
+    padding-left: 10px;
+  }
+
+  .table-container {
+    background: #fff;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    margin-bottom: 25px;
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 700px;
+  }
+
+  th, td {
+    border: 1px solid #ccc;
+    padding: 6px 8px;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  th {
+    background: #007bff;
+    color: #fff;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #f2f2f2;
+  }
+
+  .scrollable-cell {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .scrollable-cell:hover {
+    white-space: normal;
+    background: #eef4ff;
+  }
+
+  .volver {
+    margin-bottom: 20px;
+  }
+
+  .volver button {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 4px;
+    background: #6c757d;
+    color: #fff;
+    cursor: pointer;
+  }
+
+  .volver button:hover {
+    background: #5a6268;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="volver">
+  <button onclick="history.back()">⬅ Volver</button>
+</div>
+
+<h1>📚 Historial de Viajes Finalizados</h1>
+
+<div id="contenedorHistorial">
+  Cargando historial...
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+import {
+  getFirestore, collection, getDocs,
+  query, orderBy
+} from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBuAsS0aqT8e6ECtMj-mmZsBemBoMTivoY",
+  authDomain: "viajesautos.firebaseapp.com",
+  projectId: "viajesautos",
+  storageBucket: "viajesautos.firebasestorage.app",
+  messagingSenderId: "593140621786",
+  appId: "1:593140621786:web:bb5eba2477c5efda56a0e3"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const contenedor = document.getElementById("contenedorHistorial");
+
+// ------------------------------------
+// CARGAR HISTORIAL
+// ------------------------------------
+async function cargarHistorial() {
+
+  const q = query(
+    collection(db, "viajesfinalizados"),
+    orderBy("fecha", "asc")
+  );
+
+  const snap = await getDocs(q);
+
+  if (snap.empty) {
+    contenedor.innerHTML = "<p>No hay viajes finalizados.</p>";
+    return;
+  }
+
+  const viajesPorChofer = {};
+
+  snap.forEach(docSnap => {
+    const d = docSnap.data();
+    const chofer = d.chofer
+  ? d.chofer.trim().toUpperCase()
+  : "SIN CHOFER";
+
+
+    if (!viajesPorChofer[chofer]) {
+      viajesPorChofer[chofer] = [];
+    }
+
+    viajesPorChofer[chofer].push(d);
+  });
+
+  contenedor.innerHTML = "";
+
+  for (const chofer in viajesPorChofer) {
+
+    const titulo = document.createElement("h2");
+    titulo.textContent = `🚚 ${chofer}`;
+    contenedor.appendChild(titulo);
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "table-container";
+
+    const table = document.createElement("table");
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th>Fecha / Hora</th>
+          <th>Origen</th>
+          <th>Destino</th>
+          <th>Transporta</th>
+          <th>Km calculados</th>
+          <th>Km chofer</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+
+    const tbody = table.querySelector("tbody");
+
+    viajesPorChofer[chofer].forEach(v => {
+
+      const fecha = v.fecha?.toDate
+        ? v.fecha.toDate().toLocaleString("es-AR", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit"
+          })
+        : "-";
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${fecha}</td>
+        <td>${v.origen || "-"}</td>
+        <td>${(v.destinos || []).join(", ")}</td>
+        <td class="scrollable-cell">
+       ${
+        typeof v.transporta === "string" && v.transporta.startsWith("https://")
+      ? `<img 
+           src="${v.transporta}"
+           class="img-transporta"
+           data-img="${v.transporta}"
+           style="max-width:100px; border-radius:6px; cursor:pointer;"
+         >`
+      : (v.transporta || "-")
+      }
+     </td>
+        <td>${v.kmCalculado ?? "-"}</td>
+        <td>${v.kmChofer ?? "-"}</td>
+      `;
+    
+      const img = tr.querySelector(".img-transporta");
+if (img) {
+  img.onclick = () => {
+    Swal.fire({
+      html: `
+        <div class="img-modal-scroll">
+          <img src="${img.dataset.img}" style="max-width:100%" />
+        </div>
+      `,
+      showConfirmButton: false,
+      backdrop: true,
+      background: "transparent",
+      padding: 0,
+      width: "100vw",
+      didOpen: (popup) => {
+        popup.addEventListener("click", () => Swal.close());
+      }
+    });
+  };
+}
+
+      tbody.appendChild(tr);
+    });
+
+    wrapper.appendChild(table);
+    contenedor.appendChild(wrapper);
+  }
+}
+
+cargarHistorial();
+</script>
+
+</body>
+</html>

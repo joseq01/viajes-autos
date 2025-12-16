@@ -1,0 +1,8 @@
+body { font-family: Arial, Helvetica, sans-serif; margin:0; padding:12px; background:#f7fafc; }
+.container { max-width:1000px; margin:0 auto; }
+.card { background:#fff; padding:12px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.06); margin-bottom:10px; }
+.primary { background:#2b6cb0; color:white; padding:8px 12px; border-radius:6px; border:none; cursor:pointer; }
+.secondary { background:#e2e8f0; padding:8px 12px; border-radius:6px; border:none; cursor:pointer; }
+.small { font-size:0.9rem; color:#666; }
+.map { height: 60vh; border-radius:8px; overflow:hidden; }
+input, textarea { width:100%; padding:8px; margin-top:6px; border-radius:6px; border:1px solid #cbd5e1; }
