@@ -657,22 +657,42 @@ if (img) {
         });
 
         if (puntos.length === 0) {
-          // Ruta simple origen-destino
-          const directionsService = new google.maps.DirectionsService();
-          const directionsRenderer = new google.maps.DirectionsRenderer({ map: map });
 
-          directionsService.route({
-            origin: origenText,
-            destination: destinoText,
-            travelMode: google.maps.TravelMode.DRIVING
-          }, (result, status) => {
-            if (status === "OK") {
-              directionsRenderer.setDirections(result);
-            }
-          });
+  // 🔵 SI HAY ÚLTIMA POSICIÓN DEL GPS
+  if (d.ultimaPos?.lat && d.ultimaPos?.lng) {
+    const pos = {
+      lat: d.ultimaPos.lat,
+      lng: d.ultimaPos.lng
+    };
 
-          return;
-        }
+    map.setCenter(pos);
+    map.setZoom(15);
+
+    new google.maps.Marker({
+      position: pos,
+      map,
+      title: "Ubicación actual del chofer"
+    });
+
+    return;
+  }
+
+  // 🔴 SI NO HAY GPS → ruta por texto (fallback final)
+  const directionsService = new google.maps.DirectionsService();
+  const directionsRenderer = new google.maps.DirectionsRenderer({ map });
+
+  directionsService.route({
+    origin: origenText,
+    destination: destinoText,
+    travelMode: google.maps.TravelMode.DRIVING
+  }, (result, status) => {
+    if (status === "OK") {
+      directionsRenderer.setDirections(result);
+    }
+  });
+
+  return;
+}
 
         const path = puntos;
         const poly = new google.maps.Polyline({
