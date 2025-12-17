@@ -86,6 +86,18 @@
   object-fit: contain;
 }
 
+.transporta-wrap {
+  position: relative;
+  max-width: 120px;
+}
+
+.img-transporta {
+  max-width: 120px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: block;
+}
+
 </style>
 </head>
 <body>
@@ -258,15 +270,19 @@ const snapshot = await getDocs(q);
  <td class="scrollable-cell">
   ${
     typeof transporta === "string" && transporta.startsWith("https://")
-      ? `<img 
-           src="${transporta}" 
-           class="img-transporta"
-           data-img="${transporta}"
-           style="max-width:120px; border-radius:6px; cursor:pointer;"
-         >`
+      ? `
+        <div class="transporta-wrap">
+          <img 
+            src="${transporta}" 
+            class="img-transporta"
+            data-img="${transporta}"
+          >
+        </div>
+      `
       : transporta
   }
 </td>
+
   <td>${destino}</td>
   <td>pendiente</td>
   <td>
@@ -405,7 +421,11 @@ tr.querySelector(".editarBtn").onclick = async () => {
 
     preConfirm: () => {
       const origenNuevo = document.getElementById("sw-origen").value.trim();
-      const transportaNuevo = document.getElementById("sw-transporta").innerHTML.trim();
+      const transportaNuevo = document
+  .getElementById("sw-transporta")
+  .innerText
+  .trim();
+
       const destinosNuevo = document.getElementById("sw-destinos").value
         .split(",")
         .map(d => d.trim())
@@ -453,7 +473,9 @@ tr.querySelector(".editarBtn").onclick = async () => {
   // ❌ Cerró sin hacer nada
   if (!datosEditados) return;
 
+const transportaOriginal = transporta; // la que vino de Firestore
 let transportaFinal = datosEditados.transporta;
+
 
 // 🗑 si eliminó la imagen
 if (eliminarImagen) {
@@ -461,17 +483,25 @@ if (eliminarImagen) {
 }
 
 // 📤 si pegó una imagen nueva
-if (nuevaImagenBlob) {
+// 🗑 si eliminó la imagen
+if (eliminarImagen) {
+  transportaFinal = "";
+}
+
+// 📤 si pegó imagen nueva
+else if (nuevaImagenBlob) {
   const imgRef = ref(storage, `viajes/${id}_${Date.now()}.jpg`);
   await uploadBytes(imgRef, nuevaImagenBlob);
   transportaFinal = await getDownloadURL(imgRef);
 }
 
-// 💾 guardar todo junto en Firestore
-await updateDoc(doc(db, "viajes", id), {
-  ...datosEditados,
-  transporta: transportaFinal
-});
+// ♻️ si NO tocó la imagen y ya había una → conservarla
+else if (
+  typeof transportaOriginal === "string" &&
+  transportaOriginal.startsWith("https://")
+) {
+  transportaFinal = transportaOriginal;
+}
 
 
   Swal.fire({
